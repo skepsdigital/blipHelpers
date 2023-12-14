@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <title>Configuração de Filas</title>
+</head>
+<body>
+
+<div class="container mt-5">
+  <h2>Configuração de Filas</h2>
+  
+  <ul id="filaList" class="list-group">
+    <!-- Lista de filas será preenchida dinamicamente aqui -->
+  </ul>
+
+  <button type="button" class="btn btn-primary mt-3" data-toggle="modal" data-target="#addModal">Cadastrar Nova Fila</button>
+  <button type="button" class="btn btn-info mt-3" data-toggle="modal" data-target="#importModal">Importar JSON</button>
+
+  <!-- Modal de Adição -->
+  <div class="modal" id="addModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Cadastrar Nova Fila</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="addForm">
+            <div class="form-group">
+              <label for="addFila">Nome da Fila:</label>
+              <input type="text" class="form-control" id="addFila">
+            </div>
+            <div class="form-group">
+              <label for="addLimiteInicial">Limite Inicial:</label>
+              <input type="text" class="form-control" id="addLimiteInicial">
+            </div>
+            <div class="form-group">
+              <label for="addMensagem">Mensagem:</label>
+              <input type="text" class="form-control" id="addMensagem">
+            </div>
+            <div class="form-group">
+              <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="addEnabled" checked>
+                <label class="custom-control-label" for="addEnabled">Ativado</label>
+              </div>
+            </div>
+            <button type="button" class="btn btn-success" onclick="addQueue()">Cadastrar Fila</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Importação -->
+  <div class="modal" id="importModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Importar JSON</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <textarea class="form-control" id="importJson" rows="5" placeholder="Cole o JSON aqui"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" onclick="loadJson()">OK</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Edição -->
+  <div class="modal" id="editModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Editar Configuração de Fila</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="editForm">
+            <div class="form-group">
+              <label for="editFila">Fila:</label>
+              <input type="text" class="form-control" id="editFila" readonly>
+            </div>
+            <div class="form-group">
+              <label for="editLimiteInicial">Limite Inicial:</label>
+              <input type="text" class="form-control" id="editLimiteInicial">
+            </div>
+            <div class="form-group">
+              <label for="editMensagem">Mensagem:</label>
+              <input type="text" class="form-control" id="editMensagem">
+            </div>
+            <div class="form-group">
+              <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="editEnabled">
+                <label class="custom-control-label" for="editEnabled">Ativado</label>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="saveChanges()">Salvar Alterações</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-success mt-3" onclick="exportConfig()">Exportar JSON</button>
+  <textarea id="exportedJson" class="form-control mt-3" rows="10" readonly></textarea>
+</div>
+
+<script>
+  const filaList = $("#filaList");
+  const addFilaInput = $("#addFila");
+  const addLimiteInicialInput = $("#addLimiteInicial");
+  const addMensagemInput = $("#addMensagem");
+  const addEnabledCheckbox = $("#addEnabled");
+  const addModal = $("#addModal");
+  const addForm = $("#addForm");
+
+  const importJsonTextarea = $("#importJson");
+  const importModal = $("#importModal");
+
+  const editFilaInput = $("#editFila");
+  const editLimiteInicialInput = $("#editLimiteInicial");
+  const editMensagemInput = $("#editMensagem");
+  const editEnabledCheckbox = $("#editEnabled");
+  const editModal = $("#editModal");
+  const editForm = $("#editForm");
+
+  const exportedJsonTextarea = $("#exportedJson");
+
+  const configFilas = [];
+
+  exportedJsonTextarea.hide();
+
+  // Preencher a lista de filas
+  function fillQueueList() {
+    filaList.empty();
+    configFilas.forEach(config => {
+      const listItem = $(`<li class="list-group-item"><span class="queue" style="cursor:pointer">${config.fila}</span> <span class="delete-queue" style="cursor:pointer" data-fila="${config.fila}">🗑️</span></li>`);
+      filaList.append(listItem);
+    });
+  }
+
+  // Evento de clique no emoji de lixeira
+  filaList.on("click", ".delete-queue", function(event) {
+    event.stopPropagation();
+    const filaName = $(this).data("fila");
+    const index = configFilas.findIndex(config => config.fila === filaName);
+
+    if (index !== -1) {
+      configFilas.splice(index, 1);
+      fillQueueList();
+      editModal.modal("hide");
+    }
+  });
+
+  // Evento de clique em uma fila da lista
+  filaList.on("click", ".queue", function() {
+    const filaName = $(this).text().trim();
+    const config = getConfigByName(filaName);
+    if (config) {
+      fillEditForm(config);
+      editModal.modal("show");
+    }
+  });
+
+  // Função para preencher o formulário de edição com as configurações da fila
+  function fillEditForm(config) {
+    editFilaInput.val(config.fila);
+    editLimiteInicialInput.val(config.limiteInicial);
+    editMensagemInput.val(config.mensagem);
+    editEnabledCheckbox.prop("checked", config.enabled);
+  }
+
+  // Função para salvar as alterações no formulário de edição
+  function saveChanges() {
+    const filaName = editFilaInput.val();
+    const config = getConfigByName(filaName);
+    if (config) {
+      config.limiteInicial = editLimiteInicialInput.val();
+      config.mensagem = editMensagemInput.val();
+      config.enabled = editEnabledCheckbox.prop("checked");
+      editModal.modal("hide");
+    }
+  }
+
+  // Função para exportar as configurações como JSON
+  function exportConfig() {
+    exportedJsonTextarea.show();
+    const json = JSON.stringify(configFilas, null, 2);
+    exportedJsonTextarea.val(json);
+    exportedJsonTextarea.select();
+    document.execCommand("copy");
+    exportedJsonTextarea.hide();
+    alert("Configurações copiadas para area de transferência.");
+  }
+
+  // Função para obter as configurações de uma fila pelo nome
+  function getConfigByName(name) {
+    return configFilas.find(config => config.fila === name);
+  }
+
+  // Função para importar as configurações a partir de um JSON
+  function loadJson() {
+    const importedJson = importJsonTextarea.val();
+    try {
+      const jsonData = JSON.parse(importedJson);
+      if (Array.isArray(jsonData)) {
+        configFilas.length = 0; // Limpa o array atual
+        Array.prototype.push.apply(configFilas, jsonData); // Adiciona os novos elementos
+        fillQueueList();
+        importModal.modal("hide");
+      } else {
+        alert('Formato JSON inválido');
+      }
+    } catch (error) {
+      alert('Formato JSON inválido');
+    }
+  }
+
+  // Função para adicionar uma nova fila
+  function addQueue() {
+    const newFilaName = addFilaInput.val();
+    const existingConfig = getConfigByName(newFilaName);
+
+    if (!existingConfig) {
+      const newConfig = {
+        "fila": newFilaName,
+        "limiteInicial": addLimiteInicialInput.val(),
+        "mensagem": addMensagemInput.val(),
+        "enabled": addEnabledCheckbox.prop("checked")
+      };
+
+      configFilas.push(newConfig);
+      fillQueueList();
+      addForm[0].reset();
+      addModal.modal("hide");
+    } else {
+      alert("Já existe uma configuração para a fila informada.");
+    }
+  }
+
+  // Preencher a lista de filas inicialmente
+  fillQueueList();
+
+</script>
+
+</body>
+</html>
